@@ -3,13 +3,16 @@ from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
+from models import *
+from schemas import *
+from dbutils import *
 from middleware import *
 from database import get_db
 from typing import Optional
 
 router = APIRouter(
-    prefix="/route",
-    tags=["route"]
+    prefix="/account",
+    tags=["account"]
 )
 
 ###################################
@@ -21,38 +24,32 @@ router = APIRouter(
 async def root_func():
     return {"message": "Root function ran!"}
 
-#Function for token test and debbugin. Simply receives a token, reads it and returns a new token
-#Input: Http/Https request
-#Output: Http/Https request containing a new cookie
-@router.get("/debug/token")
-async def token_debug(
-    request: Request,
-    db: Session = Depends(get_db),
-    cookie: AuthToken = Depends(get_cookie_as_model)  # Decoded cookie (JWT payload)
-):
+@router.post("/register", response_model=UserReadDTO, status_code=201)
+async def user_register(payload: UserCreateDTO, db: Session = Depends(get_db)):
     try:
-        cookie_data = cookie.dict() #Converts from AuthToken to dict
-        cookie_data["debugged"] = True #Adds "debug" field
-
-        # Create a new token with fresh expiry and the debug flag
-        new_token = make_cookie_from_dict(cookie_data)
-
-        # Set the debug cookie
-        response = JSONResponse(
-            content={
-                "valid": True,
-                "token_payload": cookie_data
-            }
-        )
-        response.set_cookie(
-            key="debug_test_token",
-            value=new_token,
-            httponly=True,
-            secure=True,
-            samesite="lax"
-        )
-
-        return response
+        if get_user_by_email(db, payload.email):
+            raise HTTPException(400, detail="E-mail já cadastrado")
+        if get_user_by_username(db, payload.username):
+            raise HTTPException(400, detail="Username já cadastrado")
+        
+        user = create_user(db, payload)
+        return UserReadDTO(id=user.id, username=user.username, email=user.email)
+        
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/login", response_model=UserReadDTO, status_code=200)
+async def user_login(payload: UserLoginDTO, db: Session = Depends(get_db)):
+    try:
+        user = get_user_by_email(db, payload.email)
+        if not user:
+            raise HTTPException(400, detail="User não cadastrado")
+        pass_hashed = pass_hasher(payload.password)
+        if pass_hashed != get_password_by_id(db, user.id_password):
+            raise HTTPException(400, detail="Senha incorreta")
+        return UserReadDTO(id=user.id, username=user.username, email=user.email)
 
     except HTTPException as e:
         raise e
