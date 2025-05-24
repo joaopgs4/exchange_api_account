@@ -32,7 +32,7 @@ async def user_register(payload: UserCreateDTO, db: Session = Depends(get_db)):
             raise HTTPException(400, detail="Username já cadastrado")
         
         user = create_user(db, payload)
-        return UserReadDTO(id=user.id, username=user.username, email=user.email)
+        return user
         
     except HTTPException as e:
         raise e
@@ -44,11 +44,13 @@ async def user_login(payload: UserLoginDTO, db: Session = Depends(get_db)):
     try:
         user = get_user_by_email(db, payload.email)
         if not user:
-            raise HTTPException(400, detail="User não cadastrado")
+            raise HTTPException(400, detail="Usuário não cadastrado")
+
         pass_hashed = pass_hasher(payload.password)
-        if pass_hashed != get_password_by_id(db, user.id_password):
+        if pass_hashed != user.password256:
             raise HTTPException(400, detail="Senha incorreta")
-        return UserReadDTO(id=user.id, username=user.username, email=user.email)
+
+        return UserReadDTO(uuid=user.uuid, username=user.username, email=user.email)
 
     except HTTPException as e:
         raise e

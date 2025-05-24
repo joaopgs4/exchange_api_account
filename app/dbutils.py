@@ -10,47 +10,30 @@ PASS_SALT=os.getenv("PASS_SALT")
 if PASS_SALT is None:
     raise ValueError("Environment variable PASS_SALT is not set.")
 
-def get_user_by_email(db: Session, email: str) -> User:
-    user = db.query(User).filter(User.email == email).first()
-    if user:
-        return user
-    return None
+def get_user_by_email(db: Session, email: str) -> User | None:
+    return db.query(User).filter(User.email == email).first()
 
-def get_user_by_username(db: Session, username: str) -> User:
-    user = db.query(User).filter(User.username == username).first()
-    if user:
-        return user
-    return None
+def get_user_by_username(db: Session, username: str) -> User | None:
+    return db.query(User).filter(User.username == username).first()
 
-def get_password_by_id(db: Session, id: int) -> str:
-    password = db.query(Password).filter(Password.id == id).first()
-    if password:
-        return password.password256
-    return None
+def get_user_by_uuid(db: Session, uuid_: str) -> User | None:
+    return db.query(User).filter(User.uuid == uuid_).first()
 
-def pass_hasher(password : str) -> str:
+def pass_hasher(password: str) -> str:
     hasher = hashlib.sha256()
     hasher.update((password + PASS_SALT).encode('utf-8'))
     return hasher.hexdigest()
 
 def create_user(db: Session, userDTO: UserCreateDTO) -> UserReadDTO:
-    #Hash password
     hashed_password = pass_hasher(userDTO.password)
 
-    #Add password to db
-    password = Password(password256=hashed_password)
-    db.add(password)
-    db.commit()
-    db.refresh(password)
-
-    #Add user to db
     user = User(
         username=userDTO.username,
         email=userDTO.email,
-        id_password=password.id
+        password256=hashed_password
     )
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    return user
+    return UserReadDTO(uuid=user.uuid, username=user.username, email=user.email)

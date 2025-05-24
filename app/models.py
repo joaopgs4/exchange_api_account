@@ -1,8 +1,9 @@
 # models.py
+import uuid
 from sqlalchemy import (
-    Column, Integer, String, DateTime, Date, Time, ForeignKey, CheckConstraint, UniqueConstraint, SmallInteger
+    Column, String
 )
-from sqlalchemy.orm import relationship, declarative_base
+from sqlalchemy.orm import declarative_base
 Base = declarative_base()
 
 ######################################################################
@@ -11,22 +12,12 @@ Base = declarative_base()
 
 #Default password table for saving the user password as a hash256
 #(Receives the hashed string)
-class Password(Base):
-    __tablename__ = 'password'
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    password256 = Column(String(256), nullable=False)
 
 class User(Base):
     __tablename__ = 'user'
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    uuid = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     username = Column(String(60), nullable=False, unique=True)
     email = Column(String(45), nullable=False, unique=True)
-    id_password = Column(Integer, ForeignKey('password.id'))
+    password256 = Column(String(256), nullable=False)
 
-    password = relationship("Password")
-
-    __table_args__ = (
-        UniqueConstraint('id_password'),
-    )
