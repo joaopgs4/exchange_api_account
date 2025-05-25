@@ -1,7 +1,9 @@
 # database.py
 import os
+import time
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import OperationalError
 from models import Base
 
 #Read from environment (Docker provides it) - No use for python-dotenv (only if local .env)
@@ -13,11 +15,23 @@ if not DATABASE_URL:
     raise RuntimeError("Environment variable DATABASE_URL is not set.")
 
 #Create SQLAlchemy engine
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    echo=False
-)
+#Uses retry to try connecting to db (1o times with 3 seconds interval)
+#Prevents race condition on docker-compose and other paralelisms
+for _ in range(10):
+    try:
+        engine = create_engine(
+            DATABASE_URL,
+            pool_pre_ping=True,
+            echo=True,
+        )
+        connection = engine.connect()
+        connection.close()
+        break
+    except OperationalError:
+        print("Database not ready, retrying in 3 seconds...")
+        time.sleep(3)
+else:
+    raise RuntimeError("Database connection failed after retries.")
 
 #Session factory
 SessionLocal = sessionmaker(
